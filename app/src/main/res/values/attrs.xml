@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="TableAttendanceView">
+        <attr name="columnDateWidth" format="dimension"/>
+        <attr name="columnEventWidth" format="dimension"/>
+        <attr name="rowHeaderHeight" format="dimension"/>
+        <attr name="rowDateHeight" format="dimension"/>
+        <attr name="rowFooterHeight" format="dimension"/>
+        <attr name="backgroundColor" format="color"/>
+        <attr name="headerEventTextColor" format="color"/>
+        <attr name="headerEventTextSize" format="dimension"/>
+        <attr name="dateTextSize" format="dimension"/>
+        <attr name="scrollingSpeed" format="dimension"/>
+        <attr name="scrollingFriction" format="dimension"/>
+    </declare-styleable>
+</resources>
