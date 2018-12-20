@@ -3,4 +3,24 @@
     <color name="colorPrimary">#008577</color>
     <color name="colorPrimaryDark">#00574B</color>
     <color name="colorAccent">#D81B60</color>
+
+    <color name="ap9001_header_event_background">#D81B60</color>
+    <color name="ap9001_date_background">#D81B60</color>
+    <color name="ap9001_today_date_background">#D81B60</color>
+
+    <color name="common_text_primary">#3B3732</color>
+    <color name="common_text_secondary">#625F5A</color>
+    <color name="common_text_third">#8F8F8F</color>
+    <color name="common_color_text_hint">#5D533F</color>
+    <color name="common_color_text_hint_light">#A6A6A6</color>
+
+    <color name="ap9001_header_background">#EEEEEE</color>
+
+    <color name="ap9001_shadow_0">#C0C0C0</color>
+    <color name="ap9001_shadow_1">#E0E0E0</color>
+    <color name="ap9001_shadow_2">#EEEEEE</color>
+    <color name="ap9001_shadow_3">#f5f5f5</color>
+    <color name="ap9001_shadow_4">#fafafa</color>
+
+
 </resources>

@@ -13,6 +13,11 @@ import android.view.ViewConfiguration
 import android.widget.OverScroller
 import java.util.*
 import kotlin.collections.ArrayList
+import android.graphics.Shader.TileMode
+import android.graphics.BitmapShader
+
+
+
 
 class TableAttendanceView : View {
     companion object {
@@ -35,12 +40,12 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
-    private var mRowHeaderHeight = 120
+    private var mRowHeaderHeight = 80
         set(value) {
             field = value
             invalidate()
         }
-    private var mRowFooterHeight = 120
+    private var mRowFooterHeight = 80
         set(value) {
             field = value
             invalidate()
@@ -95,17 +100,57 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
+    private var mSundayDateTextColor = Color.RED
+        set(value) {
+            field = value
+            invalidate()
+        }
+    private var mSaturdayTextColor = Color.BLUE
+        set(value) {
+            field = value
+            invalidate()
+        }
+    private var mTodayTextColor = Color.BLACK
+        set(value) {
+            field = value
+            invalidate()
+        }
+    private var mDefaultDateBackroundColor = Color.LTGRAY
+        set(value) {
+            field = value
+            invalidate()
+        }
+    private var mTodayDateBackroundColor = Color.CYAN
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private var mHeaderEventBackgroundColor = Color.LTGRAY
+        set(value) {
+            field = value
+            invalidate()
+        }
     //endregion attrs
 
     //region paint
     private val mDefaultPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
-    private val mEventHeaderTextPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mHeaderEventTextPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mHeaderEventBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mDatePaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     //endregion paint
-
+    //region bitmap
+    private var mHeaderEventBackground: Bitmap? = null
+    private var mFooterEventBackground: Bitmap? = null
+    private var mDateBackground: Bitmap? = null
+    private var mTodayDateBackground: Bitmap? = null
+    //endregion bitmap
     //region content var
     private val mCurrentDate = Calendar.getInstance()
-    private val mEventHeader = ArrayList<String>()
-    private var mEventHeaderTextHeight: Int = 20
+    private val mHeaderEvent = ArrayList<String>()
+    private var mHeaderEventTextHeight: Int = 0
+
+
     //endregion content var
 
     private var mScaledTouchSlop = 0
@@ -242,26 +287,50 @@ class TableAttendanceView : View {
         mScroller = OverScroller(context)
         mGestureDetector = GestureDetectorCompat(context, mGestureListener)
         mScaledTouchSlop = ViewConfiguration.get(context).scaledTouchSlop
+        initPaint()
+        initBitmap()
+        initData()
+    }
 
+    private fun initBitmap() {
+        mHeaderEventBackground = drawableToBitmap(R.drawable.header_event_background, width, mRowHeaderHeight)
+        mFooterEventBackground = drawableToBitmap(R.drawable.footer_event_background, width, mRowFooterHeight)
+        mDateBackground = drawableToBitmap(R.drawable.date_background, mColumnDateWidth, mRowDateHeight)
+        mTodayDateBackground = drawableToBitmap(R.drawable.today_date_background, mColumnDateWidth, mRowDateHeight)
+    }
+
+    private fun initPaint() {
         mDefaultPaint.apply {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
             color = Color.BLACK
             textSize = 40f
         }
-        initData()
+        mHeaderEventTextPaint.apply {
+            strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
+            color = mHeaderEventTextColor
+            textSize = 40f
+        }
+        mDatePaint.apply {
+            strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
+            color = Color.BLACK
+            textSize = 40f
+        }
+        mHeaderEventBackgroundPaint.apply {
+            color = Color.LTGRAY
+        }
     }
 
     private fun initData() {
-        mEventHeader.clear()
-        mEventHeader.add("出勤") // firstCheckIn
-        mEventHeader.add("退勤") // lastCheckOut
-        mEventHeader.add("滞在") // hospitalStayTime
-        mEventHeader.add("超過") // extendedTime
-        mEventHeader.add("残業") // overtime
-        mEventHeader.add("その他") // otherTime
-        mEventHeader.add("休憩") // breaktime
-        mEventHeader.add("深夜") // nightWorkTime
-        mEventHeaderTextHeight = getTextBound(mEventHeader[0], mDefaultPaint).height()
+        mHeaderEvent.clear()
+        mHeaderEvent.add("出勤") // firstCheckIn
+        mHeaderEvent.add("退勤") // lastCheckOut
+        mHeaderEvent.add("滞在") // hospitalStayTime
+        mHeaderEvent.add("超過") // extendedTime
+        mHeaderEvent.add("残業") // overtime
+        mHeaderEvent.add("その他") // otherTime
+        mHeaderEvent.add("休憩") // breaktime
+        mHeaderEvent.add("深夜") // nightWorkTime
+        mHeaderEventTextHeight = getTextBound(mHeaderEvent[0], mDefaultPaint).height()
     }
 
     @SuppressLint("DrawAllocation")
@@ -272,37 +341,30 @@ class TableAttendanceView : View {
         debug("width: " + width)
         debug("getMaxHorizontalScroll(): " + getMaxHorizontalScroll())
         debug("getMaxVerticalScroll(): " + getMaxVerticalScroll())
-        //draw line on left of event header row
-        canvas.drawLine(
-            mColumnDateWidth.toFloat(),
-            0F,
-            mColumnDateWidth.toFloat(),
-            (height - mRowFooterHeight).toFloat(),
-            mDefaultPaint
-        )
-        //draw line in top of date column
-        canvas.drawLine(
-            0F,
-            mRowHeaderHeight.toFloat(),
-            width.toFloat(),
-            mRowHeaderHeight.toFloat(),
-            mDefaultPaint
-        )
-        //draw line top of sumary row
-        canvas.drawLine(
-            0F,
-            (height - mRowFooterHeight).toFloat(),
-            width.toFloat(),
-            (height - mRowFooterHeight).toFloat(),
-            mDefaultPaint
-        )
+
         drawDateColumn(canvas)
-        drawEventHeader(canvas)
+        drawHeaderEvent(canvas)
         drawEventAxes(canvas)
-        drawSumaryRow(canvas)
+        drawFooterEvent(canvas)
     }
 
-    private fun drawSumaryRow(canvas: Canvas) {
+    private fun drawFooterEvent(canvas: Canvas) {
+        //draw total background
+        //draw header event background
+        canvas.clipRect(
+            RectF(0F, height - mRowFooterHeight.toFloat(), width.toFloat(), height.toFloat()),
+            Region.Op.REPLACE
+        )
+        if (mFooterEventBackground == null) {
+            mFooterEventBackground = drawableToBitmap(R.drawable.footer_event_background, width, mRowFooterHeight)
+        }
+        canvas.drawBitmap(
+            mFooterEventBackground!!,
+            0f,
+            height - mRowFooterHeight.toFloat(),
+            mHeaderEventBackgroundPaint
+        )
+
         val totalHeaderRect = Rect(0, height - mRowFooterHeight, mColumnDateWidth, height)
         canvas.clipRect(totalHeaderRect, Region.Op.REPLACE)
         //draw total title
@@ -313,7 +375,7 @@ class TableAttendanceView : View {
         val totalDataRect = Rect(mColumnDateWidth, height - mRowFooterHeight, width, height)
         canvas.clipRect(totalDataRect, Region.Op.REPLACE)
         val topText = height - mRowFooterHeight / 2 + getTextBound("-", mDefaultPaint).height()
-        mEventHeader.indices.forEach { index ->
+        mHeaderEvent.indices.forEach { index ->
             val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
             val rightColum = leftColumn + mColumnEventWidth
             val leftText = (rightColum + leftColumn - mDefaultPaint.measureText("-")) / 2
@@ -321,18 +383,39 @@ class TableAttendanceView : View {
         }
     }
 
-    private fun drawEventHeader(canvas: Canvas) {
-        val eventHeaderRect = Rect(mColumnDateWidth, 0, width, mRowHeaderHeight)
-        canvas.clipRect(eventHeaderRect, Region.Op.REPLACE)
-        val topText = (mRowHeaderHeight + mEventHeaderTextHeight) / 2
-        mEventHeader.indices.forEach { index ->
+    private fun drawHeaderEvent(canvas: Canvas) {
+        //draw header event background
+        canvas.clipRect(RectF(0F, 0F, width.toFloat(), mRowHeaderHeight.toFloat()+100), Region.Op.REPLACE)
+        if (mHeaderEventBackground == null) {
+            mHeaderEventBackground = drawableToBitmap(R.drawable.header_event_background, width, mRowHeaderHeight)
+        }
+        mHeaderEventBackgroundPaint.style = Paint.Style.STROKE;
+        mHeaderEventBackgroundPaint.setShadowLayer(5.0f, 10.0f, 10.0f, Color.BLACK);
+        canvas.drawBitmap(mHeaderEventBackground!!, 0f, 0f, mHeaderEventBackgroundPaint)
+
+        //draw header event text
+        val headerEventRect = Rect(mColumnDateWidth, 0, width, mRowHeaderHeight)
+        canvas.clipRect(headerEventRect, Region.Op.REPLACE)
+        val topText = (mRowHeaderHeight + mHeaderEventTextHeight) / 2
+        mHeaderEvent.indices.forEach { index ->
             val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
             val rightColum = leftColumn + mColumnEventWidth
-            val textWidth = mDefaultPaint.measureText(mEventHeader[index])
+            val textWidth = mHeaderEventTextPaint.measureText(mHeaderEvent[index])
             val leftText = (rightColum + leftColumn) / 2 - textWidth / 2
-            canvas.drawText(mEventHeader[index], leftText, topText.toFloat(), mDefaultPaint)
-            canvas.drawLine(rightColum, 0f, rightColum, mRowHeaderHeight.toFloat(), mDefaultPaint)
+            canvas.drawText(mHeaderEvent[index], leftText, topText.toFloat(), mHeaderEventTextPaint)
         }
+    }
+
+    private fun drawableToBitmap(id: Int, width: Int, height: Int): Bitmap? {
+        if (width <= 0) {
+            return null
+        }
+        val drawable = context.resources.getDrawable(id)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
     }
 
     /**
@@ -345,27 +428,34 @@ class TableAttendanceView : View {
         } else {
             mRowDateHeight * numberOfDayInMonth
         }
-        val dateRect = Rect(0, mRowDateHeight, mColumnDateWidth, maxHeight - mRowFooterHeight)
+        val dateRect = Rect(0, mRowHeaderHeight, mColumnDateWidth, maxHeight - mRowFooterHeight)
         canvas.clipRect(dateRect, Region.Op.REPLACE)
-        canvas.drawLine(mColumnDateWidth.toFloat(), 0f, mColumnDateWidth.toFloat(), height.toFloat(), mDefaultPaint)
-        val textHeight = getTextBound("I", mDefaultPaint).height()
+        val textHeight = getTextBound("I", mDatePaint).height()
         for (i in 1..numberOfDayInMonth) {
             val startY = mCurrentOrigin.y + (i - 1) * mRowDateHeight + mRowHeaderHeight
             val stopY = mCurrentOrigin.y + mRowDateHeight * i + mRowHeaderHeight
+            val targetDate = Calendar.getInstance()
+            targetDate[Calendar.DAY_OF_MONTH] = i
+            //draw date background
+            if (targetDate.isTheSameDay(Calendar.getInstance())) {
+                canvas.drawBitmap(mTodayDateBackground!!, 0f, startY, mDatePaint)
+            } else {
+                canvas.drawBitmap(mDateBackground!!, 0f, startY, mDatePaint)
+            }
+            //draw day text
             val topText = (stopY + startY + textHeight) / 2
-            val calendar = Calendar.getInstance()
-            calendar[Calendar.DAY_OF_MONTH] = i
-            val dayTitle = getDayTitle(calendar)
-            val leftText = mColumnDateWidth * 3 / 4 - mDefaultPaint.measureText(dayTitle)
-            canvas.drawText(dayTitle, leftText, topText, mDefaultPaint)
-            canvas.drawLine(0F, stopY, mColumnDateWidth.toFloat(), stopY, mDefaultPaint)
+            val dayTitle = targetDate.getDayTitle(context, "%d日 %s")
+            val leftText = mColumnDateWidth * 3 / 4 - mDatePaint.measureText(dayTitle)
+            mDatePaint.color = getDayOfWeekColor(targetDate)
+            canvas.drawText(dayTitle, leftText, topText, mDatePaint)
+            //draw line bellow date
         }
     }
 
     private fun drawEventAxes(canvas: Canvas) {
-        val eventRect = Rect(mColumnDateWidth, mRowDateHeight, width, height - mRowFooterHeight)
+        val eventRect = Rect(mColumnDateWidth, mRowHeaderHeight, width, height - mRowFooterHeight)
         canvas.clipRect(eventRect, Region.Op.REPLACE)
-        mEventHeader.indices.forEach { index ->
+        mHeaderEvent.indices.forEach { index ->
             val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
             val rightColum = leftColumn + mColumnEventWidth
             canvas.drawLine(rightColum, 0f, rightColum, height.toFloat(), mDefaultPaint)
@@ -378,36 +468,19 @@ class TableAttendanceView : View {
         }
     }
 
-    private fun getDayTitle(calendar: Calendar, template: String = "%d日 %s"): String {
-        val dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH)
-        val week = when (calendar.get(Calendar.DAY_OF_WEEK)) {
+    private fun getDayOfWeekColor(calendar: Calendar): Int {
+        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
             Calendar.SUNDAY -> {
-                context.getString(R.string.COMMON_SUN)
-            }
-            Calendar.MONDAY -> {
-                context.getString(R.string.COMMON_MON)
-            }
-            Calendar.TUESDAY -> {
-                context.getString(R.string.COMMON_TUE)
-            }
-            Calendar.WEDNESDAY -> {
-                context.getString(R.string.COMMON_WED)
-            }
-            Calendar.THURSDAY -> {
-                context.getString(R.string.COMMON_THU)
-            }
-            Calendar.FRIDAY -> {
-                context.getString(R.string.COMMON_FRI)
+                mSundayDateTextColor
             }
             Calendar.SATURDAY -> {
-                context.getString(R.string.COMMON_SAT)
+                mSaturdayTextColor
             }
             else -> {
-                ""
+                Color.BLACK
             }
 
         }
-        return String.format(template, dayOfMonth, week)
     }
 
     private fun getTextBound(text: String, paint: Paint): Rect {
@@ -421,11 +494,11 @@ class TableAttendanceView : View {
     }
 
     private fun getMaxVerticalScroll(): Int {
-        return getNumberOfDayCurrentMonth() * mRowDateHeight + mRowHeaderHeight - height
+        return getNumberOfDayCurrentMonth() * mRowDateHeight + mRowHeaderHeight + mRowFooterHeight - height
     }
 
     private fun getMaxHorizontalScroll(): Int {
-        return mEventHeader.size * mColumnDateWidth - width + mColumnDateWidth
+        return mHeaderEvent.size * mColumnDateWidth - width + mColumnDateWidth
     }
 
     @SuppressLint("ClickableViewAccessibility")
