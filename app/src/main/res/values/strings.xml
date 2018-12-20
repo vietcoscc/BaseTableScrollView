@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">TableAttendanceKotlin</string>
+
+    <string name="COMMON_MON">月</string>
+    <string name="COMMON_TUE">火</string>
+    <string name="COMMON_WED">水</string>
+    <string name="COMMON_THU">木</string>
+    <string name="COMMON_FRI">金</string>
+    <string name="COMMON_SAT">土</string>
+    <string name="COMMON_SUN">日</string>
 </resources>

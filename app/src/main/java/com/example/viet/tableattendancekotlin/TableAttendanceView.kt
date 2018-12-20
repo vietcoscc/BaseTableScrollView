@@ -12,6 +12,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.widget.OverScroller
 import java.util.*
+import kotlin.collections.ArrayList
 
 class TableAttendanceView : View {
     companion object {
@@ -24,27 +25,27 @@ class TableAttendanceView : View {
         LEFT, RIGHT, VERTICAL, NONE
     }
 
-    private var mColumnDateWidth = 200
+    private var mColumnDateWidth = 240
         set(value) {
             field = value
             invalidate()
         }
-    private var mColumnEventWidth = 200
+    private var mColumnEventWidth = 240
         set(value) {
             field = value
             invalidate()
         }
-    private var mRowHeaderHeight = 100
+    private var mRowHeaderHeight = 120
         set(value) {
             field = value
             invalidate()
         }
-    private var mRowFooterHeight = 100
+    private var mRowFooterHeight = 120
         set(value) {
             field = value
             invalidate()
         }
-    private var mRowDateHeight = 100
+    private var mRowDateHeight = 120
         set(value) {
             field = value
             invalidate()
@@ -69,17 +70,17 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
-    private var mXScrollingSpeed = 1
+    private var mXScrollingSpeed = 0.5f
         set(value) {
             field = value
             invalidate()
         }
-    private var mYScrollingSpeed = 1
+    private var mYScrollingSpeed = 0.75f
         set(value) {
             field = value
             invalidate()
         }
-    private var mScrollingFriction = 1
+    private var mScrollingFriction = 0.75
         set(value) {
             field = value
             invalidate()
@@ -97,12 +98,15 @@ class TableAttendanceView : View {
     //endregion attrs
 
     //region paint
-    private val defaultPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mDefaultPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mEventHeaderTextPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     //endregion paint
 
-    //region others
-    private val currentDate = Calendar.getInstance()
-    //endregion others
+    //region content var
+    private val mCurrentDate = Calendar.getInstance()
+    private val mEventHeader = ArrayList<String>()
+    private var mEventHeaderTextHeight: Int = 20
+    //endregion content var
 
     private var mScaledTouchSlop = 0
     private var mCurrentOrigin: PointF = PointF(0f, 0f)
@@ -135,15 +139,14 @@ class TableAttendanceView : View {
                         mCurrentOrigin.y.toInt(),
                         (velocityX * mXScrollingSpeed).toInt(),
                         0,
-                        -(getMaxHorizontalScroll().toFloat()).toInt(),
-                        (getMaxHorizontalScroll().toFloat()).toInt(),
+                        -getMaxHorizontalScroll(),
                         0,
-                        0
+                        Integer.MIN_VALUE,
+                        Integer.MAX_VALUE
                     )
                     invalidate()
                 }
 
-//                Direction.VERTICAL -> if (e1.y > mHeaderHeight || mNeedToScrollAllDayEvents) {
                 Direction.VERTICAL ->
                     if (mCurrentOrigin.y != 0f) {
                         mScroller.fling(
@@ -153,7 +156,7 @@ class TableAttendanceView : View {
                             (velocityY * mYScrollingSpeed).toInt(),
                             Integer.MIN_VALUE,
                             Integer.MAX_VALUE,
-                            (-getMaxVerticalScroll().toFloat() + mRowHeaderHeight + height).toInt(),
+                            -getMaxVerticalScroll(),
                             0
                         )
                         invalidate()
@@ -199,11 +202,13 @@ class TableAttendanceView : View {
             }
             when (mCurrentScrollDirection) {
                 Direction.LEFT, Direction.RIGHT -> {
-                    mCurrentOrigin.x -= distanceX * mXScrollingSpeed
-                    invalidate()
+                    if (mCurrentOrigin.x - distanceX * mXScrollingSpeed < 0 && mCurrentOrigin.x - distanceX * mXScrollingSpeed > -getMaxHorizontalScroll()) {
+                        mCurrentOrigin.x -= distanceX * mXScrollingSpeed
+                        invalidate()
+                    }
                 }
                 Direction.VERTICAL -> {
-                    if (mCurrentOrigin.y - distanceY < 0) {
+                    if (mCurrentOrigin.y - distanceY < 0 && mCurrentOrigin.y - distanceY > -getMaxVerticalScroll()) {
                         mCurrentOrigin.y -= distanceY
                         invalidate()
                     }
@@ -238,60 +243,189 @@ class TableAttendanceView : View {
         mGestureDetector = GestureDetectorCompat(context, mGestureListener)
         mScaledTouchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
-        defaultPaint.strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
-        defaultPaint.color = Color.BLACK
+        mDefaultPaint.apply {
+            strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
+            color = Color.BLACK
+            textSize = 40f
+        }
+        initData()
+    }
+
+    private fun initData() {
+        mEventHeader.clear()
+        mEventHeader.add("出勤") // firstCheckIn
+        mEventHeader.add("退勤") // lastCheckOut
+        mEventHeader.add("滞在") // hospitalStayTime
+        mEventHeader.add("超過") // extendedTime
+        mEventHeader.add("残業") // overtime
+        mEventHeader.add("その他") // otherTime
+        mEventHeader.add("休憩") // breaktime
+        mEventHeader.add("深夜") // nightWorkTime
+        mEventHeaderTextHeight = getTextBound(mEventHeader[0], mDefaultPaint).height()
     }
 
     @SuppressLint("DrawAllocation")
     override fun onDraw(canvas: Canvas) {
-        val rectPaint = Paint()
-        rectPaint.strokeWidth = 2f
-        rectPaint.color = Color.BLACK
-        canvas.drawRect(
-            RectF(
-                50 + mCurrentOrigin.x,
-                50 + mCurrentOrigin.y,
-                200 + mCurrentOrigin.x,
-                200 + mCurrentOrigin.y
-            ), rectPaint
+        debug("mCurrentOrigin.x: " + mCurrentOrigin.x)
+        debug("mCurrentOrigin.y: " + mCurrentOrigin.y)
+        debug("height: " + height)
+        debug("width: " + width)
+        debug("getMaxHorizontalScroll(): " + getMaxHorizontalScroll())
+        debug("getMaxVerticalScroll(): " + getMaxVerticalScroll())
+        //draw line on left of event header row
+        canvas.drawLine(
+            mColumnDateWidth.toFloat(),
+            0F,
+            mColumnDateWidth.toFloat(),
+            (height - mRowFooterHeight).toFloat(),
+            mDefaultPaint
+        )
+        //draw line in top of date column
+        canvas.drawLine(
+            0F,
+            mRowHeaderHeight.toFloat(),
+            width.toFloat(),
+            mRowHeaderHeight.toFloat(),
+            mDefaultPaint
+        )
+        //draw line top of sumary row
+        canvas.drawLine(
+            0F,
+            (height - mRowFooterHeight).toFloat(),
+            width.toFloat(),
+            (height - mRowFooterHeight).toFloat(),
+            mDefaultPaint
         )
         drawDateColumn(canvas)
+        drawEventHeader(canvas)
+        drawEventAxes(canvas)
+        drawSumaryRow(canvas)
+    }
+
+    private fun drawSumaryRow(canvas: Canvas) {
+        val totalHeaderRect = Rect(0, height - mRowFooterHeight, mColumnDateWidth, height)
+        canvas.clipRect(totalHeaderRect, Region.Op.REPLACE)
+        //draw total title
+        val leftTotalText = (mColumnDateWidth - mDefaultPaint.measureText("Total")) / 2
+        val topTotalText = height - (mRowFooterHeight - getTextBound("Total", mDefaultPaint).height()) / 2
+        canvas.drawText("Total", leftTotalText, topTotalText.toFloat(), mDefaultPaint)
+        // draw total data
+        val totalDataRect = Rect(mColumnDateWidth, height - mRowFooterHeight, width, height)
+        canvas.clipRect(totalDataRect, Region.Op.REPLACE)
+        val topText = height - mRowFooterHeight / 2 + getTextBound("-", mDefaultPaint).height()
+        mEventHeader.indices.forEach { index ->
+            val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
+            val rightColum = leftColumn + mColumnEventWidth
+            val leftText = (rightColum + leftColumn - mDefaultPaint.measureText("-")) / 2
+            canvas.drawText("-", leftText, topText.toFloat(), mDefaultPaint)
+        }
+    }
+
+    private fun drawEventHeader(canvas: Canvas) {
+        val eventHeaderRect = Rect(mColumnDateWidth, 0, width, mRowHeaderHeight)
+        canvas.clipRect(eventHeaderRect, Region.Op.REPLACE)
+        val topText = (mRowHeaderHeight + mEventHeaderTextHeight) / 2
+        mEventHeader.indices.forEach { index ->
+            val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
+            val rightColum = leftColumn + mColumnEventWidth
+            val textWidth = mDefaultPaint.measureText(mEventHeader[index])
+            val leftText = (rightColum + leftColumn) / 2 - textWidth / 2
+            canvas.drawText(mEventHeader[index], leftText, topText.toFloat(), mDefaultPaint)
+            canvas.drawLine(rightColum, 0f, rightColum, mRowHeaderHeight.toFloat(), mDefaultPaint)
+        }
     }
 
     /**
      *
      */
     private fun drawDateColumn(canvas: Canvas) {
-        val today = Calendar.getInstance()
-        val currentMonth = today.get(Calendar.MONTH)
-        val numberOfDayInMonth = today.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val numberOfDayInMonth = getNumberOfDayCurrentMonth()
         val maxHeight: Int = if (mRowDateHeight * numberOfDayInMonth > height) {
             height
         } else {
             mRowDateHeight * numberOfDayInMonth
         }
-        val dateRect = Rect(0, 0, mColumnDateWidth, maxHeight)
+        val dateRect = Rect(0, mRowDateHeight, mColumnDateWidth, maxHeight - mRowFooterHeight)
         canvas.clipRect(dateRect, Region.Op.REPLACE)
-        val dateRectPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        dateRectPaint.color = mBackgroundColor
-        dateRectPaint.strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
-        dateRectPaint.style = Paint.Style.STROKE
-        canvas.drawRect(0f, 0f, mColumnDateWidth.toFloat(), maxHeight.toFloat(), dateRectPaint)
-
-        for (i in 0 until numberOfDayInMonth) {
-            val startY = mCurrentOrigin.y + i * mRowDateHeight + mRowHeaderHeight
-            val stopY = mCurrentOrigin.y + mRowDateHeight * (i + 1) + mRowHeaderHeight
-            canvas.drawLine(0F, startY, mColumnDateWidth.toFloat(), startY, defaultPaint)
-            canvas.drawLine(0F, stopY, mColumnDateWidth.toFloat(), stopY, defaultPaint)
+        canvas.drawLine(mColumnDateWidth.toFloat(), 0f, mColumnDateWidth.toFloat(), height.toFloat(), mDefaultPaint)
+        val textHeight = getTextBound("I", mDefaultPaint).height()
+        for (i in 1..numberOfDayInMonth) {
+            val startY = mCurrentOrigin.y + (i - 1) * mRowDateHeight + mRowHeaderHeight
+            val stopY = mCurrentOrigin.y + mRowDateHeight * i + mRowHeaderHeight
+            val topText = (stopY + startY + textHeight) / 2
+            val calendar = Calendar.getInstance()
+            calendar[Calendar.DAY_OF_MONTH] = i
+            val dayTitle = getDayTitle(calendar)
+            val leftText = mColumnDateWidth * 3 / 4 - mDefaultPaint.measureText(dayTitle)
+            canvas.drawText(dayTitle, leftText, topText, mDefaultPaint)
+            canvas.drawLine(0F, stopY, mColumnDateWidth.toFloat(), stopY, mDefaultPaint)
         }
     }
 
+    private fun drawEventAxes(canvas: Canvas) {
+        val eventRect = Rect(mColumnDateWidth, mRowDateHeight, width, height - mRowFooterHeight)
+        canvas.clipRect(eventRect, Region.Op.REPLACE)
+        mEventHeader.indices.forEach { index ->
+            val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
+            val rightColum = leftColumn + mColumnEventWidth
+            canvas.drawLine(rightColum, 0f, rightColum, height.toFloat(), mDefaultPaint)
+        }
+
+        for (i in 1..getNumberOfDayCurrentMonth()) {
+            val startY = mCurrentOrigin.y + (i - 1) * mRowDateHeight + mRowHeaderHeight
+            val stopY = startY + mRowDateHeight
+            canvas.drawLine(0F, stopY, width.toFloat(), stopY, mDefaultPaint)
+        }
+    }
+
+    private fun getDayTitle(calendar: Calendar, template: String = "%d日 %s"): String {
+        val dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH)
+        val week = when (calendar.get(Calendar.DAY_OF_WEEK)) {
+            Calendar.SUNDAY -> {
+                context.getString(R.string.COMMON_SUN)
+            }
+            Calendar.MONDAY -> {
+                context.getString(R.string.COMMON_MON)
+            }
+            Calendar.TUESDAY -> {
+                context.getString(R.string.COMMON_TUE)
+            }
+            Calendar.WEDNESDAY -> {
+                context.getString(R.string.COMMON_WED)
+            }
+            Calendar.THURSDAY -> {
+                context.getString(R.string.COMMON_THU)
+            }
+            Calendar.FRIDAY -> {
+                context.getString(R.string.COMMON_FRI)
+            }
+            Calendar.SATURDAY -> {
+                context.getString(R.string.COMMON_SAT)
+            }
+            else -> {
+                ""
+            }
+
+        }
+        return String.format(template, dayOfMonth, week)
+    }
+
+    private fun getTextBound(text: String, paint: Paint): Rect {
+        val boundingRect = Rect()
+        paint.getTextBounds(text, 0, text.length, boundingRect)
+        return boundingRect
+    }
+
+    private fun getNumberOfDayCurrentMonth(): Int {
+        return mCurrentDate.getActualMaximum(Calendar.DAY_OF_MONTH)
+    }
+
     private fun getMaxVerticalScroll(): Int {
-        return currentDate.getActualMaximum(Calendar.DAY_OF_MONTH) * mRowDateHeight
+        return getNumberOfDayCurrentMonth() * mRowDateHeight + mRowHeaderHeight - height
     }
 
     private fun getMaxHorizontalScroll(): Int {
-        return 10 * mColumnDateWidth
+        return mEventHeader.size * mColumnDateWidth - width + mColumnDateWidth
     }
 
     @SuppressLint("ClickableViewAccessibility")
