@@ -16,11 +16,12 @@
 
     <color name="ap9001_header_background">#EEEEEE</color>
 
-    <color name="ap9001_shadow_0">#C0C0C0</color>
-    <color name="ap9001_shadow_1">#E0E0E0</color>
-    <color name="ap9001_shadow_2">#EEEEEE</color>
-    <color name="ap9001_shadow_3">#f5f5f5</color>
-    <color name="ap9001_shadow_4">#fafafa</color>
+    <color name="ap9001_shadow_0">#757575</color>
+    <color name="ap9001_shadow_1">#9E9E9E</color>
+    <color name="ap9001_shadow_2">#BDBDBD</color>
+    <color name="ap9001_shadow_3">#E0E0E0</color>
+    <color name="ap9001_shadow_4">#EEEEEE</color>
+    <color name="ap9001_shadow_5">#F5F5F5</color>
 
 
 </resources>

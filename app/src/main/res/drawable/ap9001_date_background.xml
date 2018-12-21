@@ -2,22 +2,21 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape>
-            <solid android:color="@color/ap9001_shadow_1"/>
-        </shape>
-    </item>
-    <item  android:right="1dp">
-        <shape>
-            <solid android:color="@color/ap9001_shadow_0"/>
-        </shape>
-    </item>
-    <item android:right="2dp">
-        <shape>
             <solid android:color="@android:color/white"/>
         </shape>
     </item>
     <item android:right="3dp" android:bottom="1dp">
         <shape>
             <solid android:color="@color/ap9001_header_background"/>
+        </shape>
+    </item>
+    <item android:gravity="right">
+        <shape xmlns:android="http://schemas.android.com/apk/res/android">
+            <gradient
+                    android:startColor="@color/ap9001_shadow_1"
+                    android:centerColor="@color/ap9001_shadow_2"
+                    android:endColor="@color/ap9001_shadow_3"/>
+            <size android:width="2dp"/>
         </shape>
     </item>
 </layer-list>
