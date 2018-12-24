@@ -28,27 +28,27 @@ class TableAttendanceView : View {
         LEFT, RIGHT, VERTICAL, NONE
     }
 
-    private var mColumnDateWidth = 240
+    private var mColumnDateWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 100f, resources.displayMetrics).toInt()
         set(value) {
             field = value
             invalidate()
         }
-    private var mColumnEventWidth = 240
+    private var mColumnEventWidth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 100f, resources.displayMetrics).toInt()
         set(value) {
             field = value
             invalidate()
         }
-    private var mRowHeaderHeight = 80
+    private var mRowHeaderHeight = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 40f, resources.displayMetrics).toInt()
         set(value) {
             field = value
             invalidate()
         }
-    private var mRowFooterHeight = 80
+    private var mRowFooterHeight = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 40f, resources.displayMetrics).toInt()
         set(value) {
             field = value
             invalidate()
         }
-    private var mRowDateHeight = 120
+    private var mRowDateHeight = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 50f, resources.displayMetrics).toInt()
         set(value) {
             field = value
             invalidate()
@@ -79,7 +79,7 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
-    private var mDateTextSize = 40
+    private var mDateTextSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 15f, resources.displayMetrics)
         set(value) {
             field = value
             invalidate()
@@ -237,10 +237,12 @@ class TableAttendanceView : View {
         mHeaderEventRect = Rect(0, 0, width, (mRowHeaderHeight + mShadowThickness).toInt())
         mHeaderEventBackgroundRect = RectF(0f, 0f, width.toFloat(), mRowHeaderHeight - mShadowThickness)
         mDateRect = Rect(0, mRowHeaderHeight, (mColumnDateWidth + mShadowThickness).toInt(), height - mRowFooterHeight)
-        mDateBackgroundRect = Rect(0, mRowHeaderHeight, (mColumnDateWidth + mShadowThickness).toInt(), height - mRowFooterHeight)
+        mDateBackgroundRect =
+                Rect(0, mRowHeaderHeight, (mColumnDateWidth + mShadowThickness).toInt(), height - mRowFooterHeight)
         mEventRect = Rect()
         mFooterEventRect = Rect(0, (height - mRowFooterHeight - mShadowThickness).toInt(), width, height)
-        mFooterEventBackgroundRect = RectF(0f,(height - mRowFooterHeight + mShadowThickness), width.toFloat(),
+        mFooterEventBackgroundRect = RectF(
+            0f, (height - mRowFooterHeight + mShadowThickness), width.toFloat(),
             height.toFloat()
         )
         mFooterTotalEventRect = Rect(0, height - mRowFooterHeight, mColumnDateWidth, height)
@@ -260,17 +262,17 @@ class TableAttendanceView : View {
         mDefaultPaint.apply {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
             color = ContextCompat.getColor(context, R.color.common_text_primary)
-            textSize = 40f
+            textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 15f, resources.displayMetrics)
         }
         mHeaderEventTextPaint.apply {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
             color = mHeaderEventTextColor
-            textSize = mHeaderEventTextSize.toFloat()
+            textSize = mHeaderEventTextSize
         }
         mDatePaint.apply {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
             color = mDateTextColor
-            textSize = mDateTextSize.toFloat()
+            textSize = mDateTextSize
         }
         mHeaderEventBackgroundPaint.apply {
             color = mHeaderEventBackgroundColor
@@ -415,16 +417,19 @@ class TableAttendanceView : View {
         canvas.clipRect(mHeaderEventRect, Region.Op.REPLACE)
         canvas.drawRoundRect(mHeaderEventBackgroundRect, 0f, 0f, mHeaderEventBackgroundPaint)
         canvas.drawBitmap(mHeaderEventShadow!!, 0f, mRowHeaderHeight.toFloat(), mHeaderEventBackgroundPaint)
-        //draw header event text
+        mHeaderEventRect.left = mColumnDateWidth
         canvas.clipRect(mHeaderEventRect, Region.Op.REPLACE)
-        val topText = (mRowHeaderHeight + mHeaderEventTextHeight) / 2
+        mHeaderEventRect.left = 0
+        //draw header event text
         mHeaderEvent.indices.forEach { index ->
             if (index in mFirstVisibleColumn..mLastVisibleColumn) {
                 val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
                 val rightColum = leftColumn + mColumnEventWidth
                 val textWidth = mHeaderEventTextPaint.measureText(mHeaderEvent[index])
-                val leftText = (rightColum + leftColumn) / 2 - textWidth / 2
-                canvas.drawText(mHeaderEvent[index], leftText, topText.toFloat(), mHeaderEventTextPaint)
+                canvas.drawText(
+                    mHeaderEvent[index], (rightColum + leftColumn - textWidth) / 2,
+                    ((mRowHeaderHeight + mHeaderEventTextHeight) / 2).toFloat(), mHeaderEventTextPaint
+                )
             }
         }
     }
@@ -434,12 +439,17 @@ class TableAttendanceView : View {
         //draw header event background
         canvas.clipRect(mFooterEventRect, Region.Op.REPLACE)
         canvas.drawRoundRect(mFooterEventBackgroundRect, 0f, 0f, mFooterEventBackgroundPaint)
-        canvas.drawBitmap(mFooterEventShadow!!, 0f, height - mRowFooterHeight - mShadowThickness, mFooterEventBackgroundPaint)
+        canvas.drawBitmap(
+            mFooterEventShadow!!,
+            0f,
+            height - mRowFooterHeight - mShadowThickness,
+            mFooterEventBackgroundPaint
+        )
         canvas.clipRect(mFooterTotalEventRect, Region.Op.REPLACE)
         //draw total title
-        val leftTotalText = (mColumnDateWidth - mDefaultPaint.measureText("Total")) / 2
-        val topTotalText = height - (mRowFooterHeight - getTextBound("Total", mDefaultPaint).height()) / 2
-        canvas.drawText("合計", leftTotalText, topTotalText.toFloat(), mDefaultPaint)
+        val leftTotalText = (mColumnDateWidth - mDefaultPaint.measureText("Total")).toInt() shr 2
+        val topTotalText = height - (mRowFooterHeight - getTextBound("Total", mDefaultPaint).height()) shr 2
+        canvas.drawText("合計", leftTotalText.toFloat(), topTotalText.toFloat(), mDefaultPaint)
         drawSumOfTime(canvas)
 
     }
@@ -601,7 +611,12 @@ class TableAttendanceView : View {
         paint.getTextBounds(text, 0, text.length, boundingRect)
         return boundingRect
     }
-
+    /**
+     *
+     */
+    private fun  getTextHeight(text: String, paint: Paint):Int{
+        return getTextBound(text,paint).height()
+    }
     /**
      * number of day in current month
      */
