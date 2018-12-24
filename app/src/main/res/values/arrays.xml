@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="header_event">
+        <item>出勤</item>
+        <item>退勤</item>
+        <item>滞在</item>
+        <item>超過</item>
+        <item>残業</item>
+        <item>その他</item>
+        <item>休憩</item>
+        <item>深夜</item>
+    </string-array>
+</resources>

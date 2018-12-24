@@ -3,9 +3,11 @@ package com.example.viet.tableattendancekotlin
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.*
+import android.support.v4.content.ContextCompat
 import android.support.v4.view.GestureDetectorCompat
 import android.util.AttributeSet
 import android.util.Log
+import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
@@ -61,7 +63,13 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
-    private var mHeaderEventTextSize = 40
+    private var mHeaderEventTextSize =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 15f, resources.displayMetrics)
+        set(value) {
+            field = value
+            invalidate()
+        }
+    private var mEventTextSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 15f, resources.displayMetrics)
         set(value) {
             field = value
             invalidate()
@@ -81,12 +89,12 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
-    private var mYScrollingSpeed = 0.8f
+    private var mYScrollingSpeed = 1f
         set(value) {
             field = value
             invalidate()
         }
-    private var mScrollingFriction = 0.8
+    private var mScrollingFriction = 1.5f
         set(value) {
             field = value
             invalidate()
@@ -126,34 +134,64 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
-
     private var mHeaderEventBackgroundColor = Color.LTGRAY
         set(value) {
             field = value
             invalidate()
         }
+    private var mFooterEventBackgroundColor = Color.LTGRAY
+        set(value) {
+            field = value
+            invalidate()
+        }
+    private var mShadowThickness =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 1.5f, resources.displayMetrics)
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     //endregion attrs
 
     //region paint
     private val mDefaultPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mEventBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mEventTextPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mTodayEventBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mTodayEventTextPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mHeaderEventTextPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mHeaderEventBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mFooterEventBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mDatePaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     //endregion paint
     //region bitmap
-    private var mHeaderEventBackground: Bitmap? = null
-    private var mFooterEventBackground: Bitmap? = null
-    private var mDateBackground: Bitmap? = null
+    private var mHeaderEventShadow: Bitmap? = null
+    private var mFooterEventShadow: Bitmap? = null
+    private var mDateShadow: Bitmap? = null
     private var mTodayDateBackground: Bitmap? = null
     //endregion bitmap
     //region content var
     private val mCurrentDate = Calendar.getInstance()
-    private val mHeaderEvent = ArrayList<String>()
-    private var mHeaderEventTextHeight: Int = 0
-    private val mTimeSheet = TimeSheet()
+    private lateinit var mHeaderEvent: Array<String>
+    private val mTotalData = ArrayList<String>()
     private val mEventDateRects = ArrayList<EventDateRect>()
+    private var mHeaderEventTextHeight: Int = 0
 
+    private var mFirstVisibleDay: Int = 1 // start at 1
+    private var mLastVisibleDay: Int = 1
+
+    private var mFirstVisibleColumn: Int = 0 // start at 0
+    private var mLastVisibleColumn: Int = 0
+
+    private lateinit var mHeaderEventRect: Rect
+    private lateinit var mHeaderEventBackgroundRect: RectF
+    private lateinit var mDateRect: Rect
+    private lateinit var mDateBackgroundRect: Rect
+    private lateinit var mEventRect: Rect
+    private lateinit var mFooterEventRect: Rect
+    private lateinit var mFooterTotalEventRect: Rect
+    private lateinit var mFooterTotalDataEventRect: Rect
+    private lateinit var mFooterEventBackgroundRect: RectF
     //endregion content var
 
     private var mScaledTouchSlop = 0
@@ -173,31 +211,55 @@ class TableAttendanceView : View {
         } finally {
             attrs.recycle()
         }
+        mHeaderEventBackgroundColor = ContextCompat.getColor(context, R.color.ap9001_common_background)
+        mFooterEventBackgroundColor = ContextCompat.getColor(context, R.color.ap9001_common_background)
+        mDefaultDateBackroundColor = ContextCompat.getColor(context, R.color.ap9001_common_background)
         init()
     }
 
     private fun init() {
         mScroller = OverScroller(context)
+        mScroller.setFriction((ViewConfiguration.getScrollFriction() * mScrollingFriction).toFloat())
         mGestureDetector = GestureDetectorCompat(context, mGestureListener)
         mScaledTouchSlop = ViewConfiguration.get(context).scaledTouchSlop
         initPaint()
-        initBitmap()
         initData()
 
     }
 
+    override fun onMeasure(width: Int, height: Int) {
+        super.onMeasure(width, height)
+        initBitmap()
+        initAreaRect()
+    }
+
+    private fun initAreaRect() {
+        mHeaderEventRect = Rect(0, 0, width, (mRowHeaderHeight + mShadowThickness).toInt())
+        mHeaderEventBackgroundRect = RectF(0f, 0f, width.toFloat(), mRowHeaderHeight - mShadowThickness)
+        mDateRect = Rect(0, mRowHeaderHeight, (mColumnDateWidth + mShadowThickness).toInt(), height - mRowFooterHeight)
+        mDateBackgroundRect = Rect(0, mRowHeaderHeight, (mColumnDateWidth + mShadowThickness).toInt(), height - mRowFooterHeight)
+        mEventRect = Rect()
+        mFooterEventRect = Rect(0, (height - mRowFooterHeight - mShadowThickness).toInt(), width, height)
+        mFooterEventBackgroundRect = RectF(0f,(height - mRowFooterHeight + mShadowThickness), width.toFloat(),
+            height.toFloat()
+        )
+        mFooterTotalEventRect = Rect(0, height - mRowFooterHeight, mColumnDateWidth, height)
+        mFooterTotalDataEventRect = Rect(mColumnDateWidth, height - mRowFooterHeight, width, height)
+        mEventRect = Rect(mColumnDateWidth, mRowHeaderHeight, width, height - mRowFooterHeight)
+    }
+
     private fun initBitmap() {
-        mHeaderEventBackground = drawableToBitmap(R.drawable.ap9001_header_event_background, width, mRowHeaderHeight)
-        mFooterEventBackground = drawableToBitmap(R.drawable.ap9001_footer_event_background, width, mRowFooterHeight)
-        mDateBackground = drawableToBitmap(R.drawable.ap9001_date_background, mColumnDateWidth, mRowDateHeight)
+        mHeaderEventShadow = drawableToBitmap(R.drawable.ap9001_shadow_bottom, width, mShadowThickness.toInt())
+        mFooterEventShadow = drawableToBitmap(R.drawable.ap9001_shadow_top, width, mShadowThickness.toInt())
+        mDateShadow = drawableToBitmap(R.drawable.ap9001_shadow_right, mShadowThickness.toInt(), height)
         mTodayDateBackground =
-                drawableToBitmap(R.drawable.ap9001_today_date_background, mColumnDateWidth, mRowDateHeight)
+                drawableToBitmap(R.drawable.ap9001_today_date_background, mShadowThickness.toInt(), height)
     }
 
     private fun initPaint() {
         mDefaultPaint.apply {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
-            color = context.resources.getColor(R.color.common_text_primary)
+            color = ContextCompat.getColor(context, R.color.common_text_primary)
             textSize = 40f
         }
         mHeaderEventTextPaint.apply {
@@ -211,47 +273,54 @@ class TableAttendanceView : View {
             textSize = mDateTextSize.toFloat()
         }
         mHeaderEventBackgroundPaint.apply {
-            color = Color.LTGRAY
+            color = mHeaderEventBackgroundColor
         }
-
+        mFooterEventBackgroundPaint.apply {
+            color = ContextCompat.getColor(context, R.color.ap9001_common_background)
+        }
         mEventBackgroundPaint.apply {
-            color = context.resources.getColor(R.color.ap9001_shadow_5)
+            strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
+            color = ContextCompat.getColor(context, R.color.ap9001_common_background)
+        }
+        mTodayEventBackgroundPaint.apply {
+            strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
+            color = Color.YELLOW
+        }
+        mTodayEventTextPaint.apply {
+            strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
+            color = ContextCompat.getColor(context, R.color.common_text_primary)
+            textSize = mEventTextSize
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        mEventTextPaint.apply {
+            strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
+            color = ContextCompat.getColor(context, R.color.common_text_primary)
+            textSize = mEventTextSize
         }
     }
 
     private fun initData() {
-        mHeaderEvent.clear()
-        mHeaderEvent.add("出勤") // firstCheckIn
-        mHeaderEvent.add("退勤") // lastCheckOut
-        mHeaderEvent.add("滞在") // hospitalStayTime
-        mHeaderEvent.add("超過") // extendedTime
-        mHeaderEvent.add("残業") // overtime
-        mHeaderEvent.add("その他") // otherTime
-        mHeaderEvent.add("休憩") // breaktime
-        mHeaderEvent.add("深夜") // nightWorkTime
-
-
+        mHeaderEvent = resources.getStringArray(R.array.header_event)
         onLoadDataSuccess()
-
         mHeaderEventTextHeight = getTextBound(mHeaderEvent[0], mDefaultPaint).height()
     }
 
     private fun onLoadDataSuccess() {
         mEventDateRects.clear()
+        mTotalData.clear()
         val timeSheet = TimeSheet()
-        for(i in 1..getNumberOfDayInCurrentMonth()){
+        for (i in 1..getNumberOfDayInCurrentMonth()) {
+            val data = ArrayList<String>()
+            data.add("01:00")
+            data.add("01:00")
+            data.add("01:00")
+            data.add("01:00")
+            data.add("01:00")
+            data.add("01:00")
+            data.add("01:00")
+            data.add("01:00")
             timeSheet.timeSheetItems.add(
-                TimeSheetItem(
-                    i,
-                    "01:00",
-                    "00:00",
-                    "00:00",
-                    "00:00",
-                    "00:00",
-                    "00:00",
-                    "00:00",
-                    "00:00"
-                )
+                TimeSheetItem(i, data)
             )
         }
 
@@ -271,6 +340,36 @@ class TableAttendanceView : View {
             }
         }
 
+        for (i in 0..mHeaderEvent.size) {
+            mTotalData.add(
+                when (i) {
+                    0, 1 -> {
+                        "_"
+                    }
+                    2 -> {
+                        timeSheet.sumOfTimeInCell?.columnInHospitalTime ?: ""
+                    }
+                    3 -> {
+                        timeSheet.sumOfTimeInCell?.columnExtendedTime ?: ""
+                    }
+                    4 -> {
+                        timeSheet.sumOfTimeInCell?.columnOvertime ?: ""
+                    }
+                    5 -> {
+                        timeSheet.sumOfTimeInCell?.columnOthertime ?: ""
+                    }
+                    6 -> {
+                        timeSheet.sumOfTimeInCell?.columnBreakTime ?: ""
+                    }
+                    7 -> {
+                        timeSheet.sumOfTimeInCell?.columnNightWorkTime ?: ""
+                    }
+                    else -> {
+                        ""
+                    }
+                }
+            )
+        }
     }
 
     @SuppressLint("DrawAllocation")
@@ -281,98 +380,82 @@ class TableAttendanceView : View {
         debug("width: " + width)
         debug("getMaxHorizontalScroll(): " + getMaxHorizontalScroll())
         debug("getMaxVerticalScroll(): " + getMaxVerticalScroll())
-
+        prepairToDraw()
+        drawEventAndAxes(canvas)
         drawDateColumn(canvas)
         drawHeaderEvent(canvas)
-        drawEventAndAxes(canvas)
         drawFooterEvent(canvas)
+    }
+
+    private fun prepairToDraw() {
+        mFirstVisibleDay = Math.abs(mCurrentOrigin.y / mRowDateHeight).toInt() + 1
+        mLastVisibleDay = mFirstVisibleDay + (height - mRowHeaderHeight - mRowFooterHeight) / mRowDateHeight + 1
+        if (mFirstVisibleDay < 1) {
+            mFirstVisibleDay = 1
+        }
+        if (mLastVisibleDay > getNumberOfDayInCurrentMonth()) {
+            mLastVisibleDay = getNumberOfDayInCurrentMonth()
+        }
+        mFirstVisibleColumn = Math.abs(mCurrentOrigin.x / mColumnEventWidth).toInt()
+        mLastVisibleColumn = mFirstVisibleColumn + (width - mColumnDateWidth) / mColumnEventWidth + 1
+        if (mFirstVisibleColumn < 0) {
+            mFirstVisibleColumn = 0
+        }
+        if (mLastVisibleColumn > mHeaderEvent.size - 1) {
+            mLastVisibleColumn = mHeaderEvent.size - 1
+        }
+        debug("mFirstVisibleDay" + mFirstVisibleDay)
+        debug("mLastVisibleDay" + mLastVisibleDay)
+        debug("mFirstVisibleColumn" + mFirstVisibleColumn)
+        debug("mLastVisibleColumn" + mLastVisibleColumn)
+    }
+
+    private fun drawHeaderEvent(canvas: Canvas) {
+        //draw header event background
+        canvas.clipRect(mHeaderEventRect, Region.Op.REPLACE)
+        canvas.drawRoundRect(mHeaderEventBackgroundRect, 0f, 0f, mHeaderEventBackgroundPaint)
+        canvas.drawBitmap(mHeaderEventShadow!!, 0f, mRowHeaderHeight.toFloat(), mHeaderEventBackgroundPaint)
+        //draw header event text
+        canvas.clipRect(mHeaderEventRect, Region.Op.REPLACE)
+        val topText = (mRowHeaderHeight + mHeaderEventTextHeight) / 2
+        mHeaderEvent.indices.forEach { index ->
+            if (index in mFirstVisibleColumn..mLastVisibleColumn) {
+                val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
+                val rightColum = leftColumn + mColumnEventWidth
+                val textWidth = mHeaderEventTextPaint.measureText(mHeaderEvent[index])
+                val leftText = (rightColum + leftColumn) / 2 - textWidth / 2
+                canvas.drawText(mHeaderEvent[index], leftText, topText.toFloat(), mHeaderEventTextPaint)
+            }
+        }
     }
 
     private fun drawFooterEvent(canvas: Canvas) {
         //draw total background
         //draw header event background
-        canvas.clipRect(
-            RectF(0F, height - mRowFooterHeight.toFloat(), width.toFloat(), height.toFloat()),
-            Region.Op.REPLACE
-        )
-        if (mFooterEventBackground == null) {
-            mFooterEventBackground =
-                    drawableToBitmap(R.drawable.ap9001_footer_event_background, width, mRowFooterHeight)
-        }
-        canvas.drawBitmap(
-            mFooterEventBackground!!,
-            0f,
-            height - mRowFooterHeight.toFloat(),
-            mHeaderEventBackgroundPaint
-        )
-
-        val totalHeaderRect = Rect(0, height - mRowFooterHeight, mColumnDateWidth, height)
-        canvas.clipRect(totalHeaderRect, Region.Op.REPLACE)
+        canvas.clipRect(mFooterEventRect, Region.Op.REPLACE)
+        canvas.drawRoundRect(mFooterEventBackgroundRect, 0f, 0f, mFooterEventBackgroundPaint)
+        canvas.drawBitmap(mFooterEventShadow!!, 0f, height - mRowFooterHeight - mShadowThickness, mFooterEventBackgroundPaint)
+        canvas.clipRect(mFooterTotalEventRect, Region.Op.REPLACE)
         //draw total title
         val leftTotalText = (mColumnDateWidth - mDefaultPaint.measureText("Total")) / 2
         val topTotalText = height - (mRowFooterHeight - getTextBound("Total", mDefaultPaint).height()) / 2
-        canvas.drawText("Total", leftTotalText, topTotalText.toFloat(), mDefaultPaint)
+        canvas.drawText("合計", leftTotalText, topTotalText.toFloat(), mDefaultPaint)
         drawSumOfTime(canvas)
 
     }
 
     private fun drawSumOfTime(canvas: Canvas) {
-        val totalDataRect = Rect(mColumnDateWidth, height - mRowFooterHeight, width, height)
-        canvas.clipRect(totalDataRect, Region.Op.REPLACE)
-        mHeaderEvent.indices.forEach { index ->
-            val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
-            val rightColum = leftColumn + mColumnEventWidth
-            var data: String? = "-"
-            when (index) {
-                0, 1 -> {
-                    data = "-"
-                }
-                2 -> {
-                    data = mTimeSheet.sumOfTimeInCell?.columnInHospitalTime ?: ""
-                }
-                3 -> {
-                    data = mTimeSheet.sumOfTimeInCell?.columnExtendedTime ?: ""
-                }
-                4 -> {
-                    data = mTimeSheet.sumOfTimeInCell?.columnOvertime ?: ""
-                }
-                5 -> {
-                    data = mTimeSheet.sumOfTimeInCell?.columnOthertime ?: ""
-                }
-                6 -> {
-                    data = mTimeSheet.sumOfTimeInCell?.columnBreakTime ?: ""
-                }
-                7 -> {
-                    data = mTimeSheet.sumOfTimeInCell?.columnNightWorkTime ?: ""
-                }
+        canvas.clipRect(mFooterTotalDataEventRect, Region.Op.REPLACE)
+        mTotalData.indices.forEach { index ->
+            if (index in mFirstVisibleColumn..mLastVisibleColumn) {
+                val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
+                val rightColum = leftColumn + mColumnEventWidth
+                val data: String? = mTotalData[index]
+                val leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
+                val topText =
+                    (height - mRowFooterHeight / 2 + getTextBound(data!!, mDefaultPaint).height() / 2).toFloat()
+                canvas.drawText(data, leftText, topText, mDefaultPaint)
             }
-            val leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
-            val topText = (height - mRowFooterHeight / 2 + getTextBound(data!!, mDefaultPaint).height() / 2).toFloat()
-            canvas.drawText(data, leftText, topText, mDefaultPaint)
-        }
-    }
-
-    private fun drawHeaderEvent(canvas: Canvas) {
-        //draw header event background
-        canvas.clipRect(RectF(0F, 0F, width.toFloat(), mRowHeaderHeight.toFloat() + 100), Region.Op.REPLACE)
-        if (mHeaderEventBackground == null) {
-            mHeaderEventBackground =
-                    drawableToBitmap(R.drawable.ap9001_header_event_background, width, mRowHeaderHeight)
-        }
-        mHeaderEventBackgroundPaint.style = Paint.Style.STROKE;
-        mHeaderEventBackgroundPaint.setShadowLayer(5.0f, 10.0f, 10.0f, Color.BLACK);
-        canvas.drawBitmap(mHeaderEventBackground!!, 0f, 0f, mHeaderEventBackgroundPaint)
-
-        //draw header event text
-        val headerEventRect = Rect(mColumnDateWidth, 0, width, mRowHeaderHeight)
-        canvas.clipRect(headerEventRect, Region.Op.REPLACE)
-        val topText = (mRowHeaderHeight + mHeaderEventTextHeight) / 2
-        mHeaderEvent.indices.forEach { index ->
-            val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
-            val rightColum = leftColumn + mColumnEventWidth
-            val textWidth = mHeaderEventTextPaint.measureText(mHeaderEvent[index])
-            val leftText = (rightColum + leftColumn) / 2 - textWidth / 2
-            canvas.drawText(mHeaderEvent[index], leftText, topText.toFloat(), mHeaderEventTextPaint)
         }
     }
 
@@ -380,35 +463,42 @@ class TableAttendanceView : View {
         if (width <= 0) {
             return null
         }
-        val drawable = context.resources.getDrawable(id)
+        if (height <= 0) {
+            return null
+        }
+        val drawable = ContextCompat.getDrawable(context, id)
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable!!.setBounds(0, 0, canvas.width, canvas.height)
         drawable.draw(canvas)
         return bitmap
     }
 
     private fun drawDateColumn(canvas: Canvas) {
-        val numberOfDayInMonth = getNumberOfDayInCurrentMonth()
-        val maxHeight: Int = if (mRowDateHeight * numberOfDayInMonth > height) {
-            height
-        } else {
-            mRowDateHeight * numberOfDayInMonth
-        }
-        val dateRect = Rect(0, mRowHeaderHeight, mColumnDateWidth, maxHeight - mRowFooterHeight)
-        canvas.clipRect(dateRect, Region.Op.REPLACE)
+        canvas.clipRect(mDateRect, Region.Op.REPLACE)
+        canvas.drawBitmap(mDateShadow!!, mColumnDateWidth.toFloat(), mRowHeaderHeight.toFloat(), mDatePaint)
         val textHeight = getTextBound("I", mDatePaint).height()
-        for (i in 1..numberOfDayInMonth) {
+        for (i in mFirstVisibleDay..mLastVisibleDay) {
             val startY = mCurrentOrigin.y + (i - 1) * mRowDateHeight + mRowHeaderHeight
             val stopY = mCurrentOrigin.y + mRowDateHeight * i + mRowHeaderHeight
             val targetDate = Calendar.getInstance()
             targetDate[Calendar.DAY_OF_MONTH] = i
             //draw date background
             if (targetDate.isTheSameDay(Calendar.getInstance())) {
-                canvas.drawBitmap(mTodayDateBackground!!, 0f, startY, mDatePaint)
+                mDatePaint.color = mTodayDateBackroundColor
+                mDatePaint.typeface = Typeface.DEFAULT_BOLD
             } else {
-                canvas.drawBitmap(mDateBackground!!, 0f, startY, mDatePaint)
+                mDatePaint.color = mDefaultDateBackroundColor
+                mDatePaint.typeface = Typeface.DEFAULT
             }
+            canvas.drawRoundRect(
+                RectF(
+                    0f,
+                    startY,
+                    mColumnDateWidth.toFloat() - mShadowThickness,
+                    stopY - mShadowThickness
+                ), 0f, 0f, mDatePaint
+            )
             //draw day text
             val topText = (stopY + startY + textHeight) / 2
             val dayTitle = targetDate.getDayTitle(context, "%d日 %s")
@@ -420,29 +510,29 @@ class TableAttendanceView : View {
     }
 
     private fun drawEventAndAxes(canvas: Canvas) {
-
-        mHeaderEvent.indices.forEach { index ->
-            if (index % 2 == 1) {
-                val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
-                val rightColum = leftColumn + mColumnEventWidth
-                val backgroundRect =  RectF(leftColumn, mRowHeaderHeight.toFloat(), rightColum, (height - mRowFooterHeight).toFloat())
-                canvas.clipRect(backgroundRect)
-                canvas.drawRoundRect(backgroundRect, 0F, 0F, mEventBackgroundPaint)
+        canvas.clipRect(mEventRect, Region.Op.REPLACE)
+        mEventDateRects.indices.forEach { index ->
+            if (index + 1 in mFirstVisibleDay..mLastVisibleDay) {
+                val startY = mCurrentOrigin.y + (index) * mRowDateHeight + mRowHeaderHeight
+                val stopY = mCurrentOrigin.y + mRowDateHeight * (index + 1) + mRowHeaderHeight
+                val dateRect = Rect(mColumnDateWidth, startY.toInt(), width, stopY.toInt())
+                mEventDateRects[index].rect = dateRect
+                val targetDate = Calendar.getInstance()
+                targetDate[Calendar.DAY_OF_MONTH] = index + 1
+                //draw date background
+                drawEvent(
+                    mEventDateRects[index],
+                    startY,
+                    stopY,
+                    canvas,
+                    targetDate.isTheSameDay(Calendar.getInstance())
+                ) // row
             }
         }
-        val eventRect = Rect(mColumnDateWidth, mRowHeaderHeight, width, height - mRowFooterHeight)
-        canvas.clipRect(eventRect, Region.Op.REPLACE)
-        for (i in 1..getNumberOfDayInCurrentMonth()) {
+        for (i in mFirstVisibleDay..mLastVisibleDay) {
             val startY = mCurrentOrigin.y + (i - 1) * mRowDateHeight + mRowHeaderHeight
             val stopY = startY + mRowDateHeight
             canvas.drawLine(0F, stopY, width.toFloat(), stopY, mDefaultPaint)
-        }
-        mEventDateRects.indices.forEach { index ->
-            val startY = mCurrentOrigin.y + (index) * mRowDateHeight + mRowHeaderHeight
-            val stopY = mCurrentOrigin.y + mRowDateHeight * (index + 1) + mRowHeaderHeight
-            val dateRect = Rect(mColumnDateWidth, startY.toInt(), width, stopY.toInt())
-            mEventDateRects[index].rect = dateRect
-            drawEvent(mEventDateRects[index], startY, stopY, canvas) // row
         }
     }
 
@@ -457,57 +547,29 @@ class TableAttendanceView : View {
      * 6->breaktime
      * 7->nightWorkTime
      */
-    private fun drawEvent(eventDateRect: EventDateRect, startY: Float, stopY: Float, canvas: Canvas) {
+    private fun drawEvent(eventDateRect: EventDateRect, startY: Float, stopY: Float, canvas: Canvas, isToday: Boolean) {
         mHeaderEvent.indices.forEach { index ->
-            val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
-            val rightColum = leftColumn + mColumnEventWidth
-            var data = ""
-            var leftText = 0f
-            var topText = 0f
-            when (index) {
-                0 -> {
-                    data = eventDateRect.timeSheetItem?.checkInTime ?: ""
-                    leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
-                    topText = (startY + stopY + getTextBound(data, mDefaultPaint).height()) / 2
+            if (index in mFirstVisibleColumn..mLastVisibleColumn) {
+                val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
+                val rightColum = leftColumn + mColumnEventWidth
+                val backgroundRect = RectF(leftColumn, startY, rightColum, stopY)
+                if (index % 2 == 1) {
+                    canvas.drawRoundRect(backgroundRect, 0F, 0F, mEventBackgroundPaint)
                 }
-                1 -> {
-                    data = eventDateRect.timeSheetItem?.checkOutTime ?: ""
-                    leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
-                    topText = (startY + stopY + getTextBound(data, mDefaultPaint).height()) / 2
+                if (isToday) {
+                    canvas.drawRoundRect(backgroundRect, 0F, 0F, mTodayEventBackgroundPaint)
                 }
-                2 -> {
-                    data = eventDateRect.timeSheetItem?.inHospitalTime ?: ""
-                    leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
-                    topText = (startY + stopY + getTextBound(data, mDefaultPaint).height()) / 2
+                val data = eventDateRect.timeSheetItem?.data!![index]
+                if (isToday) {
+                    val leftText = (rightColum + leftColumn - mTodayEventTextPaint.measureText(data)) / 2
+                    val topText = (startY + stopY + getTextBound(data, mTodayEventTextPaint).height()) / 2
+                    canvas.drawText(data, leftText, topText, mTodayEventTextPaint)
+                } else {
+                    val leftText = (rightColum + leftColumn - mEventTextPaint.measureText(data)) / 2
+                    val topText = (startY + stopY + getTextBound(data, mEventTextPaint).height()) / 2
+                    canvas.drawText(data, leftText, topText, mEventTextPaint)
                 }
-                3 -> {
-                    data = eventDateRect.timeSheetItem?.extendedTime ?: ""
-                    leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
-                    topText = (startY + stopY + getTextBound(data, mDefaultPaint).height()) / 2
-                }
-                4 -> {
-                    data = eventDateRect.timeSheetItem?.overTime ?: ""
-                    leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
-                    topText = (startY + stopY + getTextBound(data, mDefaultPaint).height()) / 2
-                }
-                5 -> {
-                    data = eventDateRect.timeSheetItem?.otherTime ?: ""
-                    leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
-                    topText = (startY + stopY + getTextBound(data, mDefaultPaint).height()) / 2
-                }
-                6 -> {
-                    data = eventDateRect.timeSheetItem?.breakTime ?: ""
-                    leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
-                    topText = (startY + stopY + getTextBound(data, mDefaultPaint).height()) / 2
-                }
-                7 -> {
-                    data = eventDateRect.timeSheetItem?.nightWorkTime ?: ""
-                    leftText = (rightColum + leftColumn - mDefaultPaint.measureText(data)) / 2
-                    topText = (startY + stopY + getTextBound(data, mDefaultPaint).height()) / 2
-                }
-
             }
-            canvas.drawText(data, leftText, topText, mDefaultPaint)
         }
     }
 

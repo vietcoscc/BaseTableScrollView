@@ -14,7 +14,7 @@
     <color name="common_color_text_hint">#5D533F</color>
     <color name="common_color_text_hint_light">#A6A6A6</color>
 
-    <color name="ap9001_header_background">#EEEEEE</color>
+    <color name="ap9001_common_background">#E0E0E0</color>
 
     <color name="ap9001_shadow_0">#757575</color>
     <color name="ap9001_shadow_1">#9E9E9E</color>
