@@ -2,10 +2,10 @@ package com.example.viet.tableattendancekotlin
 
 import android.content.Context
 import java.util.*
+import kotlin.collections.HashMap
 
-fun Calendar.getDayTitle(context: Context, template: String = "%d %s"): String {
-    val dayOfMonth = this.get(Calendar.DAY_OF_MONTH)
-    val week = when (this.get(Calendar.DAY_OF_WEEK)) {
+fun Int.getDayTitle(context: Context,mDayOfWeekInMonth: HashMap<Int,Int>, template: String = "%d %s"): String {
+    val week:String = when (mDayOfWeekInMonth[this]) {
         Calendar.SUNDAY -> {
             context.getString(R.string.COMMON_SUN)
         }
@@ -32,7 +32,7 @@ fun Calendar.getDayTitle(context: Context, template: String = "%d %s"): String {
         }
 
     }
-    return String.format(template, dayOfMonth, week)
+    return String.format(template,this, week)
 }
 
 /**
