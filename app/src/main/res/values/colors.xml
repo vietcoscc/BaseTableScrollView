@@ -23,5 +23,7 @@
     <color name="ap9001_shadow_4">#EEEEEE</color>
     <color name="ap9001_shadow_5">#F5F5F5</color>
 
+    <color name="ap9001_saturday_color">#4991DC</color>
+    <color name="ap9001_sunday_color">#D11D29</color>
 
 </resources>

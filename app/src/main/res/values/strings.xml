@@ -9,4 +9,6 @@
     <string name="COMMON_SAT">土</string>
     <string name="COMMON_SUN">日</string>
 
+    <string name="ap9001_saturday_color">#4991DC</string>
+    <string name="ap9001_sunday_color">#</string>
 </resources>

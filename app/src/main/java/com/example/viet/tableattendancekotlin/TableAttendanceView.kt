@@ -59,12 +59,12 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
-    private var mBackgroundColor = Color.rgb(1, 2, 3)
+    private var mHeaderEventTextColor = Color.rgb(59, 55, 50)
         set(value) {
             field = value
             invalidate()
         }
-    private var mHeaderEventTextColor = Color.BLACK
+    private var mFooterEventTextColor = Color.rgb(59, 55, 50)
         set(value) {
             field = value
             invalidate()
@@ -75,12 +75,18 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
+    private var mFooterEventTextSize =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 15f, resources.displayMetrics)
+        set(value) {
+            field = value
+            invalidate()
+        }
     private var mEventTextSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 15f, resources.displayMetrics)
         set(value) {
             field = value
             invalidate()
         }
-    private var mDateTextColor = Color.BLACK
+    private var mDateTextColor = Color.rgb(59, 55, 50)
         set(value) {
             field = value
             invalidate()
@@ -115,37 +121,42 @@ class TableAttendanceView : View {
             field = value
             invalidate()
         }
-    private var mSundayDateTextColor = Color.RED
+    private var mSundayDateTextColor = Color.rgb(209, 29, 41)
         set(value) {
             field = value
             invalidate()
         }
-    private var mSaturdayTextColor = Color.BLUE
+    private var mSaturdayTextColor = Color.rgb(73, 145, 220)
         set(value) {
             field = value
             invalidate()
         }
-    private var mTodayTextColor = Color.BLACK
+    private var mDefaultDateBackroundColor = Color.rgb(224, 224, 224)
         set(value) {
             field = value
             invalidate()
         }
-    private var mDefaultDateBackroundColor = Color.LTGRAY
+    private var mTodayDateBackroundColor = Color.rgb(204, 238, 255)
         set(value) {
             field = value
             invalidate()
         }
-    private var mTodayDateBackroundColor = Color.CYAN
+    private var mHeaderEventBackgroundColor = Color.rgb(224, 224, 224)
         set(value) {
             field = value
             invalidate()
         }
-    private var mHeaderEventBackgroundColor = Color.LTGRAY
+    private var mFooterEventBackgroundColor = Color.rgb(224, 224, 224)
         set(value) {
             field = value
             invalidate()
         }
-    private var mFooterEventBackgroundColor = Color.LTGRAY
+    private var mEventBackgroundColor = Color.rgb(242, 242, 242)
+        set(value) {
+            field = value
+            invalidate()
+        }
+    private var mTodayEventBackgroundColor = Color.rgb(255, 255, 204)
         set(value) {
             field = value
             invalidate()
@@ -167,17 +178,17 @@ class TableAttendanceView : View {
     private val mTodayEventTextPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mHeaderEventTextPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mHeaderEventBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mFooterEventTextPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mFooterEventBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mDatePaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
+    private val mDateBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mTodayDatePaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mTodayDateBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
-    private val mDateBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     //endregion paint
     //region bitmap
     private var mHeaderEventShadow: Bitmap? = null
     private var mFooterEventShadow: Bitmap? = null
     private var mDateShadow: Bitmap? = null
-    private var mTodayDateBackground: Bitmap? = null
     //endregion bitmap
     //region content var
     private val mCurrentDate = Calendar.getInstance()
@@ -189,7 +200,6 @@ class TableAttendanceView : View {
 
     private var mFirstVisibleDay: Int = 1 // start at 1
     private var mLastVisibleDay: Int = 1
-
     private var mFirstVisibleColumn: Int = 0 // start at 0
     private var mLastVisibleColumn: Int = 0
 
@@ -221,9 +231,6 @@ class TableAttendanceView : View {
         } finally {
             attrs.recycle()
         }
-        mHeaderEventBackgroundColor = ContextCompat.getColor(context, R.color.ap9001_common_background)
-        mFooterEventBackgroundColor = ContextCompat.getColor(context, R.color.ap9001_common_background)
-        mDefaultDateBackroundColor = ContextCompat.getColor(context, R.color.ap9001_common_background)
         init()
     }
 
@@ -234,7 +241,6 @@ class TableAttendanceView : View {
         mScaledTouchSlop = ViewConfiguration.get(context).scaledTouchSlop
         initPaint()
         initData()
-
     }
 
     override fun onMeasure(width: Int, height: Int) {
@@ -264,8 +270,6 @@ class TableAttendanceView : View {
         mHeaderEventShadow = drawableToBitmap(R.drawable.ap9001_shadow_bottom, width, mShadowThickness.toInt())
         mFooterEventShadow = drawableToBitmap(R.drawable.ap9001_shadow_top, width, mShadowThickness.toInt())
         mDateShadow = drawableToBitmap(R.drawable.ap9001_shadow_right, mShadowThickness.toInt(), height)
-        mTodayDateBackground =
-                drawableToBitmap(R.drawable.ap9001_today_date_background, mShadowThickness.toInt(), height)
     }
 
     private fun initPaint() {
@@ -278,6 +282,11 @@ class TableAttendanceView : View {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
             color = mHeaderEventTextColor
             textSize = mHeaderEventTextSize
+        }
+        mFooterEventTextPaint.apply {
+            strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
+            color = mFooterEventTextColor
+            textSize = mFooterEventTextSize
         }
         mDatePaint.apply {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
@@ -300,15 +309,15 @@ class TableAttendanceView : View {
             color = mHeaderEventBackgroundColor
         }
         mFooterEventBackgroundPaint.apply {
-            color = ContextCompat.getColor(context, R.color.ap9001_common_background)
+            color = mFooterEventBackgroundColor
         }
         mEventBackgroundPaint.apply {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
-            color = ContextCompat.getColor(context, R.color.ap9001_common_background)
+            color = mEventBackgroundColor
         }
         mTodayEventBackgroundPaint.apply {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
-            color = Color.YELLOW
+            color = mTodayEventBackgroundColor
         }
         mTodayEventTextPaint.apply {
             strokeWidth = DEFAULT_STROKE_WIDTH.toFloat()
@@ -478,12 +487,11 @@ class TableAttendanceView : View {
             height - mRowFooterHeight - mShadowThickness,
             mFooterEventBackgroundPaint
         )
-
         //draw total title
         canvas.clipRect(mFooterTotalEventRect, Region.Op.REPLACE)
-        val leftTotalText = (mColumnDateWidth - mDefaultPaint.measureText("合計")).toInt() shr 1
-        val topTotalText = height - (mRowFooterHeight - getTextHeight("合計", mDefaultPaint) shr 1)
-        canvas.drawText("合計", leftTotalText.toFloat(), topTotalText.toFloat(), mDefaultPaint)
+        val leftTotalText = (mColumnDateWidth - mFooterEventTextPaint.measureText("合計")).toInt() shr 1
+        val topTotalText = height - (mRowFooterHeight - getTextHeight("合計", mFooterEventTextPaint) shr 1)
+        canvas.drawText("合計", leftTotalText.toFloat(), topTotalText.toFloat(), mFooterEventTextPaint)
         drawSumOfTime(canvas)
 
     }
@@ -631,7 +639,7 @@ class TableAttendanceView : View {
                 mSaturdayTextColor
             }
             else -> {
-                Color.BLACK
+                mDateTextColor
             }
 
         }
