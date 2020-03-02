@@ -169,7 +169,6 @@ class TableAttendanceView : View {
         }
 
     //endregion attrs
-
     //region paint
     private val mDefaultPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
     private val mEventBackgroundPaint: Paint by lazy { Paint(Paint.ANTI_ALIAS_FLAG) }
@@ -220,7 +219,117 @@ class TableAttendanceView : View {
     private var mCurrentFlingDirection = Direction.NONE
     private lateinit var mScroller: OverScroller
     private lateinit var mGestureDetector: GestureDetectorCompat
+    private var mGestureListener = object : GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(e: MotionEvent?): Boolean {
+            debug("onDown")
+            return true
+        }
 
+        override fun onFling(e1: MotionEvent, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+            debug("onFling")
+            if (mCurrentFlingDirection == Direction.LEFT && !mHorizontalFlingEnabled ||
+                mCurrentFlingDirection == Direction.RIGHT && !mHorizontalFlingEnabled ||
+                mCurrentFlingDirection == Direction.VERTICAL && !mVerticalFlingEnabled
+            ) {
+                return true
+            }
+
+            mScroller.forceFinished(true)
+
+            mCurrentFlingDirection = mCurrentScrollDirection
+            when (mCurrentFlingDirection) {
+                Direction.LEFT, Direction.RIGHT -> {
+                    mScroller.fling(
+                        mCurrentOrigin.x.toInt(),
+                        mCurrentOrigin.y.toInt(),
+                        (velocityX * mXScrollingSpeed).toInt(),
+                        0,
+                        -getMaxHorizontalScroll(),
+                        0,
+                        Integer.MIN_VALUE,
+                        Integer.MAX_VALUE
+                    )
+                    invalidate()
+                }
+
+                Direction.VERTICAL ->
+                    if (mCurrentOrigin.y != 0f) {
+                        mScroller.fling(
+                            mCurrentOrigin.x.toInt(),
+                            mCurrentOrigin.y.toInt(),
+                            0,
+                            (velocityY * mYScrollingSpeed).toInt(),
+                            Integer.MIN_VALUE,
+                            Integer.MAX_VALUE,
+                            -getMaxVerticalScroll(),
+                            0
+                        )
+                        invalidate()
+
+                    }
+                else -> {
+                    //do nothing
+                }
+            }
+            return true
+        }
+
+        override fun onScroll(e1: MotionEvent, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+            debug("onScroll")
+            when (mCurrentScrollDirection) {
+                Direction.NONE -> {
+                    // Allow scrolling only in one direction.
+                    mCurrentScrollDirection = if (Math.abs(distanceX) > Math.abs(distanceY)) {
+                        if (distanceX > 0) {
+                            Direction.LEFT
+                        } else {
+                            Direction.RIGHT
+                        }
+                    } else {
+                        Direction.VERTICAL
+                    }
+                }
+                Direction.LEFT -> {
+                    // Change direction if there was enough change.
+                    if (Math.abs(distanceX) > Math.abs(distanceY) && distanceX < -mScaledTouchSlop) {
+                        mCurrentScrollDirection = Direction.RIGHT
+                    }
+                }
+                Direction.RIGHT -> {
+                    // Change direction if there was enough change.
+                    if (Math.abs(distanceX) > Math.abs(distanceY) && distanceX > mScaledTouchSlop) {
+                        mCurrentScrollDirection = Direction.LEFT
+                    }
+                }
+                else -> {
+                    //do nothing
+                }
+            }
+            when (mCurrentScrollDirection) {
+                Direction.LEFT, Direction.RIGHT -> {
+                    if (mCurrentOrigin.x - distanceX * mXScrollingSpeed < 0 && mCurrentOrigin.x - distanceX * mXScrollingSpeed > -getMaxHorizontalScroll()) {
+                        mCurrentOrigin.x -= distanceX * mXScrollingSpeed
+                        invalidate()
+                    }
+                }
+                Direction.VERTICAL -> {
+                    if (mCurrentOrigin.y - distanceY < 0 && mCurrentOrigin.y - distanceY > -getMaxVerticalScroll()) {
+                        mCurrentOrigin.y -= distanceY
+                        invalidate()
+                    }
+                }
+                else -> {
+                    //do nothing
+                }
+            }
+            return true
+        }
+
+        override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
+            println("onSingleTapConfirmed")
+            return true
+        }
+    }
 
     constructor(context: Context) : super(context)
     constructor(context: Context, attrs: AttributeSet?) : this(context, attrs, 0)
@@ -243,10 +352,24 @@ class TableAttendanceView : View {
         initData()
     }
 
-    override fun onMeasure(width: Int, height: Int) {
-        super.onMeasure(width, height)
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
         initBitmap()
         initAreaRect()
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        debug("mCurrentOrigin.x: " + mCurrentOrigin.x)
+        debug("mCurrentOrigin.y: " + mCurrentOrigin.y)
+        debug("height: " + height)
+        debug("width: " + width)
+        debug("getMaxHorizontalScroll(): " + getMaxHorizontalScroll())
+        debug("getMaxVerticalScroll(): " + getMaxVerticalScroll())
+        prepairToDraw()
+        drawEventAndAxes(canvas)
+        drawDateColumn(canvas)
+        drawHeaderEvent(canvas)
+        drawFooterEvent(canvas)
     }
 
     private fun initAreaRect() {
@@ -410,21 +533,6 @@ class TableAttendanceView : View {
 
     }
 
-    @SuppressLint("DrawAllocation")
-    override fun onDraw(canvas: Canvas) {
-        debug("mCurrentOrigin.x: " + mCurrentOrigin.x)
-        debug("mCurrentOrigin.y: " + mCurrentOrigin.y)
-        debug("height: " + height)
-        debug("width: " + width)
-        debug("getMaxHorizontalScroll(): " + getMaxHorizontalScroll())
-        debug("getMaxVerticalScroll(): " + getMaxVerticalScroll())
-        prepairToDraw()
-        drawEventAndAxes(canvas)
-        drawDateColumn(canvas)
-        drawHeaderEvent(canvas)
-        drawFooterEvent(canvas)
-    }
-
     private fun prepairToDraw() {
         mFirstVisibleDay = Math.abs(mCurrentOrigin.y / mRowDateHeight).toInt() + 1
         mLastVisibleDay = mFirstVisibleDay + (height - mRowHeaderHeight - mRowFooterHeight) / mRowDateHeight + 1
@@ -453,11 +561,14 @@ class TableAttendanceView : View {
      */
     private fun drawHeaderEvent(canvas: Canvas) {
         //draw header event background
-        canvas.clipRect(mHeaderEventRect, Region.Op.REPLACE)
+        canvas.save()
+        canvas.clipRect(mHeaderEventRect)
         canvas.drawRoundRect(mHeaderEventBackgroundRect, 0f, 0f, mHeaderEventBackgroundPaint)
         canvas.drawBitmap(mHeaderEventShadow!!, 0f, mRowHeaderHeight.toFloat(), mHeaderEventBackgroundPaint)
         mHeaderEventRect.left = mColumnDateWidth
-        canvas.clipRect(mHeaderEventRect, Region.Op.REPLACE)
+        canvas.restore()
+        canvas.save()
+        canvas.clipRect(mHeaderEventRect)
         mHeaderEventRect.left = 0
         //draw header event text
         mHeaderEvent.indices.forEach { index ->
@@ -470,6 +581,7 @@ class TableAttendanceView : View {
                 canvas.drawText(mHeaderEvent[index], leftText, topText, mHeaderEventTextPaint)
             }
         }
+        canvas.restore()
     }
 
     /**
@@ -479,7 +591,8 @@ class TableAttendanceView : View {
     private fun drawFooterEvent(canvas: Canvas) {
         //draw total background
         //draw header event background
-        canvas.clipRect(mFooterEventRect, Region.Op.REPLACE)
+        canvas.save()
+        canvas.clipRect(mFooterEventRect)
         canvas.drawRoundRect(mFooterEventBackgroundRect, 0f, 0f, mFooterEventBackgroundPaint)
         canvas.drawBitmap(
             mFooterEventShadow!!,
@@ -487,20 +600,23 @@ class TableAttendanceView : View {
             height - mRowFooterHeight - mShadowThickness,
             mFooterEventBackgroundPaint
         )
+        canvas.restore()
         //draw total title
-        canvas.clipRect(mFooterTotalEventRect, Region.Op.REPLACE)
+        canvas.save()
+        canvas.clipRect(mFooterTotalEventRect)
         val leftTotalText = (mColumnDateWidth - mFooterEventTextPaint.measureText("合計")).toInt() shr 1
         val topTotalText = height - (mRowFooterHeight - getTextHeight("合計", mFooterEventTextPaint) shr 1)
         canvas.drawText("合計", leftTotalText.toFloat(), topTotalText.toFloat(), mFooterEventTextPaint)
+        canvas.restore()
         drawSumOfTime(canvas)
-
     }
 
     /**
      * draw total data
      */
     private fun drawSumOfTime(canvas: Canvas) {
-        canvas.clipRect(mFooterTotalDataEventRect, Region.Op.REPLACE)
+        canvas.save()
+        canvas.clipRect(mFooterTotalDataEventRect)
         mTotalData.indices.forEach { index ->
             if (index in mFirstVisibleColumn..mLastVisibleColumn) {
                 val leftColumn = index * mColumnEventWidth + mCurrentOrigin.x + mColumnDateWidth
@@ -511,6 +627,7 @@ class TableAttendanceView : View {
                 canvas.drawText(data, leftText.toFloat(), topText.toFloat(), mDefaultPaint)
             }
         }
+        canvas.restore()
     }
 
     /**
@@ -532,7 +649,8 @@ class TableAttendanceView : View {
     }
 
     private fun drawDateColumn(canvas: Canvas) {
-        canvas.clipRect(mDateRect, Region.Op.REPLACE)
+        canvas.save()
+        canvas.clipRect(mDateRect)
         canvas.drawBitmap(mDateShadow!!, mColumnDateWidth.toFloat(), mRowHeaderHeight.toFloat(), mDatePaint)
         val textHeight = getTextBound("I", mDatePaint).height()
         for (i in mFirstVisibleDay..mLastVisibleDay) {
@@ -562,10 +680,12 @@ class TableAttendanceView : View {
             }
             //draw line bellow date
         }
+        canvas.restore()
     }
 
     private fun drawEventAndAxes(canvas: Canvas) {
-        canvas.clipRect(mEventRect, Region.Op.REPLACE)
+        canvas.save()
+        canvas.clipRect(mEventRect)
         mEventDateRects.indices.forEach { index ->
             if (index + 1 in mFirstVisibleDay..mLastVisibleDay) {
                 val startY = mCurrentOrigin.y + (index) * mRowDateHeight + mRowHeaderHeight
@@ -586,6 +706,7 @@ class TableAttendanceView : View {
             val stopY = startY + mRowDateHeight
             canvas.drawLine(0F, stopY, width.toFloat(), stopY, mDefaultPaint)
         }
+        canvas.restore()
     }
 
     /**
@@ -680,118 +801,6 @@ class TableAttendanceView : View {
      */
     private fun getMaxHorizontalScroll(): Int {
         return mHeaderEvent.size * mColumnDateWidth - width + mColumnDateWidth
-    }
-
-    private var mGestureListener = object : GestureDetector.SimpleOnGestureListener() {
-        override fun onDown(e: MotionEvent?): Boolean {
-            debug("onDown")
-            return true
-        }
-
-        override fun onFling(e1: MotionEvent, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
-            debug("onFling")
-            if (mCurrentFlingDirection == Direction.LEFT && !mHorizontalFlingEnabled ||
-                mCurrentFlingDirection == Direction.RIGHT && !mHorizontalFlingEnabled ||
-                mCurrentFlingDirection == Direction.VERTICAL && !mVerticalFlingEnabled
-            ) {
-                return true
-            }
-
-            mScroller.forceFinished(true)
-
-            mCurrentFlingDirection = mCurrentScrollDirection
-            when (mCurrentFlingDirection) {
-                Direction.LEFT, Direction.RIGHT -> {
-                    mScroller.fling(
-                        mCurrentOrigin.x.toInt(),
-                        mCurrentOrigin.y.toInt(),
-                        (velocityX * mXScrollingSpeed).toInt(),
-                        0,
-                        -getMaxHorizontalScroll(),
-                        0,
-                        Integer.MIN_VALUE,
-                        Integer.MAX_VALUE
-                    )
-                    invalidate()
-                }
-
-                Direction.VERTICAL ->
-                    if (mCurrentOrigin.y != 0f) {
-                        mScroller.fling(
-                            mCurrentOrigin.x.toInt(),
-                            mCurrentOrigin.y.toInt(),
-                            0,
-                            (velocityY * mYScrollingSpeed).toInt(),
-                            Integer.MIN_VALUE,
-                            Integer.MAX_VALUE,
-                            -getMaxVerticalScroll(),
-                            0
-                        )
-                        invalidate()
-
-                    }
-                else -> {
-                    //do nothing
-                }
-            }
-            return true
-        }
-
-        override fun onScroll(e1: MotionEvent, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
-            debug("onScroll")
-            when (mCurrentScrollDirection) {
-                Direction.NONE -> {
-                    // Allow scrolling only in one direction.
-                    mCurrentScrollDirection = if (Math.abs(distanceX) > Math.abs(distanceY)) {
-                        if (distanceX > 0) {
-                            Direction.LEFT
-                        } else {
-                            Direction.RIGHT
-                        }
-                    } else {
-                        Direction.VERTICAL
-                    }
-                }
-                Direction.LEFT -> {
-                    // Change direction if there was enough change.
-                    if (Math.abs(distanceX) > Math.abs(distanceY) && distanceX < -mScaledTouchSlop) {
-                        mCurrentScrollDirection = Direction.RIGHT
-                    }
-                }
-                Direction.RIGHT -> {
-                    // Change direction if there was enough change.
-                    if (Math.abs(distanceX) > Math.abs(distanceY) && distanceX > mScaledTouchSlop) {
-                        mCurrentScrollDirection = Direction.LEFT
-                    }
-                }
-                else -> {
-                    //do nothing
-                }
-            }
-            when (mCurrentScrollDirection) {
-                Direction.LEFT, Direction.RIGHT -> {
-                    if (mCurrentOrigin.x - distanceX * mXScrollingSpeed < 0 && mCurrentOrigin.x - distanceX * mXScrollingSpeed > -getMaxHorizontalScroll()) {
-                        mCurrentOrigin.x -= distanceX * mXScrollingSpeed
-                        invalidate()
-                    }
-                }
-                Direction.VERTICAL -> {
-                    if (mCurrentOrigin.y - distanceY < 0 && mCurrentOrigin.y - distanceY > -getMaxVerticalScroll()) {
-                        mCurrentOrigin.y -= distanceY
-                        invalidate()
-                    }
-                }
-                else -> {
-                    //do nothing
-                }
-            }
-            return true
-        }
-
-        override fun onSingleTapConfirmed(e: MotionEvent?): Boolean {
-            println("onSingleTapConfirmed")
-            return true
-        }
     }
 
     @SuppressLint("ClickableViewAccessibility")
