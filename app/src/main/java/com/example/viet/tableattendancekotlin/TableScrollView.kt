@@ -18,7 +18,7 @@ import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
 
-class TableAttendanceView : View {
+class TableScrollView : View {
     companion object {
         const val DEBUG = true
         const val DEFAULT_STROKE_WIDTH = 1
@@ -843,7 +843,7 @@ class TableAttendanceView : View {
      */
     private fun debug(message: String) {
         if (DEBUG) {
-            Log.d("TableAttendanceView", message)
+            Log.d("TableScrollView", message)
         }
     }
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <declare-styleable name="TableAttendanceView">
+    <declare-styleable name="TableScrollView">
         <attr name="columnDateWidth" format="dimension"/>
         <attr name="columnEventWidth" format="dimension"/>
         <attr name="rowHeaderHeight" format="dimension"/>

@@ -34,14 +34,3 @@ fun Int.getDayTitle(context: Context,mDayOfWeekInMonth: HashMap<Int,Int>, templa
     }
     return String.format(template,this, week)
 }
-
-/**
- * Checks if two times are on the same day.
- *
- * @param calendar The second day.
- * @return Whether the times are on the same day.
- */
-fun Calendar.isTheSameDay(calendar: Calendar): Boolean {
-    return this.get(Calendar.YEAR) == calendar.get(Calendar.YEAR)
-            && this.get(Calendar.DAY_OF_YEAR) == calendar.get(Calendar.DAY_OF_YEAR)
-}
